@@ -1,0 +1,6 @@
+{
+  "name": "Kokoro Cal",
+  "description": "An anime-styled interactive Japan aesthetics calendar with habit tracking, drag-and-drop tasks, and beautiful analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
