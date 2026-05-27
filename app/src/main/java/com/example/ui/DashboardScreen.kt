@@ -38,6 +38,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import com.example.R
 import com.example.data.CalendarEvent
 import com.example.data.Habit
@@ -53,6 +55,7 @@ fun DashboardScreen(
 ) {
     val context = LocalContext.current
     val isDark by viewModel.isDarkMode.collectAsStateWithLifecycle()
+    val animeTheme by viewModel.animeTheme.collectAsStateWithLifecycle()
     val authState by viewModel.isAuthenticated.collectAsStateWithLifecycle()
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
     val isSynced by viewModel.isGoogleCalendarSynced.collectAsStateWithLifecycle()
@@ -83,6 +86,12 @@ fun DashboardScreen(
                 userEmail = userEmail,
                 onLogInSimulation = { viewModel.signIn("helloashikul@gmail.com") },
                 onLogOutSimulation = { viewModel.signOut() }
+            )
+
+            // Dynamic Anime Master Theme picker strip
+            AnimeThemeSelector(
+                activeTheme = animeTheme,
+                onThemeSelected = { viewModel.setAnimeTheme(it) }
             )
 
             // Date strip controller
@@ -290,6 +299,77 @@ fun HeaderBannerSection(
     }
 }
 
+// ==================== ANIME THEME SELECTOR ====================
+@Composable
+fun AnimeThemeSelector(
+    activeTheme: String,
+    onThemeSelected: (String) -> Unit
+) {
+    val themes = listOf(
+        "TOKYO_NIGHT" to ("🌃 Tokyo Cyber" to Color(0xFFFF4E8D)),
+        "SAKURA_BLOSSOM" to ("🌸 Sakura Bloom" to Color(0xFFFF8DA1)),
+        "MIKU_TEAL" to ("🎤 Miku Teal" to Color(0xFF00E5FF)),
+        "SUNSHINE_ORANGE" to ("🦊 Sunny Naruto" to Color(0xFFFF7E00)),
+        "EVA_UNIT_01" to ("🤖 Neon Eva" to Color(0xFF9400D3))
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = "🎨 SELECT ANIME THEME",
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            themes.forEach { (key, info) ->
+                val (label, tint) = info
+                val isSelected = activeTheme == key
+                Card(
+                    modifier = Modifier
+                        .clickable { onThemeSelected(key) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) tint.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                    ),
+                    border = BorderStroke(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) tint else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(tint, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ==================== CALENDAR WEEK STRIP ====================
 @Composable
 fun CalendarStripSection(
@@ -300,6 +380,13 @@ fun CalendarStripSection(
     val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     val formatDay = SimpleDateFormat("dd", Locale.getDefault())
     val formatDayOfWeek = SimpleDateFormat("EEE", Locale.getDefault())
+    val formatMonthYear = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+
+    val currentDate = remember(selectedDate) {
+        try { sdf.parse(selectedDate) } catch(e: Exception) { Date() } ?: Date()
+    }
+
+    var isMonthView by remember { mutableStateOf(true) }
 
     // Generate current week dates
     val datesOfCurrentWeek = remember {
@@ -313,20 +400,59 @@ fun CalendarStripSection(
         list
     }
 
+    val cal = Calendar.getInstance()
+    cal.time = currentDate
+    val currentMonthIdx = cal.get(Calendar.MONTH)
+    val currentYear = cal.get(Calendar.YEAR)
+
+    // Generate month days list (including padded empty slots)
+    val monthDays = remember(currentMonthIdx, currentYear) {
+        val list = mutableListOf<Date?>()
+        val tempCal = Calendar.getInstance()
+        tempCal.set(Calendar.YEAR, currentYear)
+        tempCal.set(Calendar.MONTH, currentMonthIdx)
+        tempCal.set(Calendar.DAY_OF_MONTH, 1)
+
+        val firstDayOfWeek = tempCal.get(Calendar.DAY_OF_WEEK)
+        // Pad days before the first day of the month
+        for (i in 1 until firstDayOfWeek) {
+            list.add(null)
+        }
+
+        val daysInMonth = tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        for (i in 1..daysInMonth) {
+            list.add(tempCal.time.clone() as Date)
+            tempCal.add(Calendar.DAY_OF_MONTH, 1)
+        }
+        list
+    }
+
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { isMonthView = !isMonthView }
+            ) {
+                Text(
+                    text = if (isMonthView) "📅 Whole Month Grid" else "🌸 Weekly Stream",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = if (isMonthView) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Expand month calendar",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
             Text(
-                text = "🌸 Active Calendar Space",
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = selectedDate,
+                text = "${formatMonthYear.format(currentDate)}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -335,53 +461,151 @@ fun CalendarStripSection(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            datesOfCurrentWeek.forEach { dateStr ->
-                val date = sdf.parse(dateStr) ?: Date()
-                val isSelected = dateStr == selectedDate
-                val dayNum = formatDay.format(date)
-                val dayOfWeek = formatDayOfWeek.format(date).take(3)
-
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 3.dp)
-                        .clickable { onDateSelected(dateStr) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        }
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+        if (isMonthView) {
+            // Render beautiful whole month calendar grid
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    // S M T W T F S headers
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = dayOfWeek,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa").forEach { wd ->
+                            Text(
+                                text = wd,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val rows = monthDays.chunked(7)
+                    rows.forEach { rowDays ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            rowDays.forEach { dayDate ->
+                                if (dayDate == null) {
+                                    Spacer(modifier = Modifier.weight(1f).aspectRatio(1.2f).padding(2.dp))
+                                } else {
+                                    val dateStr = sdf.format(dayDate)
+                                    val isSelected = dateStr == selectedDate
+                                    val isToday = sdf.format(Date()) == dateStr
+                                    val dayNum = formatDay.format(dayDate)
+
+                                    Card(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1.2f)
+                                            .padding(2.dp)
+                                            .clickable { onDateSelected(dateStr) },
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isSelected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else if (isToday) {
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                            } else {
+                                                Color.Transparent
+                                            }
+                                        ),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary 
+                                            else if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) 
+                                            else Color.Transparent
+                                        )
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = dayNum,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) {
+                                                    MaterialTheme.colorScheme.onPrimary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            if (rowDays.size < 7) {
+                                for (i in 0 until (7 - rowDays.size)) {
+                                    Spacer(modifier = Modifier.weight(1f).aspectRatio(1.2f).padding(2.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Render standard single row week strip
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                datesOfCurrentWeek.forEach { dateStr ->
+                    val date = sdf.parse(dateStr) ?: Date()
+                    val isSelected = dateStr == selectedDate
+                    val dayNum = formatDay.format(date)
+                    val dayOfWeek = formatDayOfWeek.format(date).take(3)
+
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 3.dp)
+                            .clickable { onDateSelected(dateStr) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            }
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = dayNum,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = dayOfWeek,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = dayNum,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
@@ -400,8 +624,17 @@ fun CalendarScheduleView(
     selectedDate: String
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val tasks by viewModel.tasksForSelectedDate.collectAsStateWithLifecycle()
     val events by viewModel.eventsForSelectedDate.collectAsStateWithLifecycle()
+
+    val isGmailConnected by viewModel.isGmailConnected.collectAsStateWithLifecycle()
+    val isDriveConnected by viewModel.isDriveConnected.collectAsStateWithLifecycle()
+    val isTasksConnected by viewModel.isTasksConnected.collectAsStateWithLifecycle()
+    val isKeepConnected by viewModel.isKeepConnected.collectAsStateWithLifecycle()
+    val isMeetConnected by viewModel.isMeetConnected.collectAsStateWithLifecycle()
+
+    val loadingStates = remember { mutableStateMapOf<String, Boolean>() }
 
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var clickedHourToAdd by remember { mutableStateOf(-1) }
@@ -412,65 +645,253 @@ fun CalendarScheduleView(
             .padding(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Google Calendar Sync Card
+        // Google Workspace Ecosystem Hub
         item {
+            var showWorkspaceIntegrations by remember { mutableStateOf(false) }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 border = bubbleCardBorder,
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xFF131230) else Color(0xFFFFECEF)
+                    containerColor = if (isDark) Color(0xFF13122B) else Color(0xFFFFECEF)
                 )
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Google Calendar Sync Client",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (isSynced) "Synced with active account data! (Offline Cached)" else "Connect to import Google Calendar events & timeslots.",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFF4285F4).copy(alpha = 0.15f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudQueue,
+                                contentDescription = "Google",
+                                tint = Color(0xFF4285F4),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Google Cloud Synchronizer",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = if (isSynced || isGmailConnected || isDriveConnected || isTasksConnected) "Active connections synchronized offline" else "Select Workspace Apps below to bridge your schedule",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
+
+                        IconButton(onClick = { showWorkspaceIntegrations = !showWorkspaceIntegrations }) {
+                            Icon(
+                                imageVector = if (showWorkspaceIntegrations) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Toggle integrations panel",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
 
-                    if (isSyncing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 2.dp
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Main Google Calendar integration
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = "Calendar",
+                            tint = Color(0xFF4285F4),
+                            modifier = Modifier.size(20.dp)
                         )
-                    } else {
-                        Button(
-                            onClick = {
-                                if (isSynced) {
-                                    viewModel.unsyncGoogleCalendar()
-                                    Toast.makeText(context, "Cleared Google Calendar Cache!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    viewModel.syncGoogleCalendar()
-                                    Toast.makeText(context, "Google Calendar Synced Offline Cache!", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                        ) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isSynced) "Disconnect" else "Sync Now ⚡",
-                                fontSize = 11.sp,
+                                text = "Google Calendar Client",
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            Text(
+                                text = if (isSynced) "Imported timeslots into timeline" else "Sync timeslots & calendar events",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (isSynced) {
+                                        viewModel.unsyncGoogleCalendar()
+                                        Toast.makeText(context, "Cleared Google Calendar Cache!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        viewModel.syncGoogleCalendar()
+                                        Toast.makeText(context, "Google Calendar Cache Synced!", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (isSynced) "Disconnect" else "Sync Now",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    // Expanded Subsection of other Google apps (Gmail, Drive, Tasks, Keep, Meet)
+                    AnimatedVisibility(visible = showWorkspaceIntegrations || isGmailConnected || isDriveConnected || isTasksConnected || isKeepConnected || isMeetConnected) {
+                        Column {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Divider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = "CONNECT GOOGLE WORKSPACE APPS",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            // Grid or vertical list of other Workspace platforms
+                            val itemsList = listOf(
+                                Triple("Gmail", "Bridge unread threads as task items", isGmailConnected),
+                                Triple("Drive", "Link project assets & file folders", isDriveConnected),
+                                Triple("Tasks", "Bi-directional personal checkboxes sync", isTasksConnected),
+                                Triple("Keep", "Import visual stickies and doodles", isKeepConnected),
+                                Triple("Meet", "Auto-insert meeting links to timelines", isMeetConnected)
+                            )
+
+                            itemsList.forEach { (name, subtitle, isConnected) ->
+                                val isLoadingAppConnection = loadingStates[name] == true
+
+                                val iconColor = when (name) {
+                                    "Gmail" -> Color(0xFFEA4335)
+                                    "Drive" -> Color(0xFFFBBC05)
+                                    "Tasks" -> Color(0xFF4285F4)
+                                    "Keep" -> Color(0xFFFFBB00)
+                                    else -> Color(0xFF34A853) // Google Meet
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .background(iconColor.copy(alpha = 0.15f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = when (name) {
+                                                "Gmail" -> Icons.Default.Email
+                                                "Drive" -> Icons.Default.FolderOpen
+                                                "Tasks" -> Icons.Default.ListAlt
+                                                "Keep" -> Icons.Default.Edit
+                                                else -> Icons.Default.Videocam
+                                            },
+                                            contentDescription = name,
+                                            tint = iconColor,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Google $name Link",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = subtitle,
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    if (isLoadingAppConnection) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = iconColor,
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        TextButton(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    loadingStates[name] = true
+                                                    kotlinx.coroutines.delay(800)
+                                                    loadingStates[name] = false
+                                                    when (name) {
+                                                        "Gmail" -> {
+                                                            viewModel.toggleGmailConnection()
+                                                            Toast.makeText(context, if (!isGmailConnected) "Successfully integrated Gmail inbox items!" else "Disconnected Gmail", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        "Drive" -> {
+                                                            viewModel.toggleDriveConnection()
+                                                            Toast.makeText(context, if (!isDriveConnected) "Linked Google Drive repository asset-vault!" else "Disconnected Drive Assets", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        "Tasks" -> {
+                                                            viewModel.toggleTasksConnection()
+                                                            Toast.makeText(context, if (!isTasksConnected) "Google Tasks synchronized with Priority board!" else "Disconnected Google Tasks", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        "Keep" -> {
+                                                            viewModel.toggleKeepConnection()
+                                                            Toast.makeText(context, if (!isKeepConnected) "Google Keep digital note boards synchronized!" else "Disconnected Google Keep", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        "Meet" -> {
+                                                            viewModel.toggleMeetConnection()
+                                                            Toast.makeText(context, if (!isMeetConnected) "Google Meet digital video camera links enabled!" else "Disabled Meet links", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.textButtonColors(
+                                                contentColor = if (isConnected) MaterialTheme.colorScheme.error else iconColor
+                                            ),
+                                            contentPadding = PaddingValues(horizontal = 8.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isConnected) "Disconnect" else "Connect Link",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -580,6 +1001,8 @@ fun CalendarScheduleView(
                                         ScheduledTaskCard(
                                             task = task,
                                             isDark = isDark,
+                                            isMeetConnected = isMeetConnected,
+                                            isDriveConnected = isDriveConnected,
                                             onToggleComplete = { viewModel.toggleTaskCompletion(it) },
                                             onMoveHour = { newHr -> viewModel.rescheduleTask(task, newHr) },
                                             onDeleteTask = { viewModel.deleteTask(it) }
@@ -610,6 +1033,8 @@ fun CalendarScheduleView(
                 UnscheduledTaskCard(
                     task = task,
                     isDark = isDark,
+                    isMeetConnected = isMeetConnected,
+                    isDriveConnected = isDriveConnected,
                     onToggleComplete = { viewModel.toggleTaskCompletion(it) },
                     onScheduleToHour = { hour -> viewModel.rescheduleTask(task, hour) },
                     onDeleteTask = { viewModel.deleteTask(it) }
@@ -729,6 +1154,8 @@ fun GoogleEventCard(event: CalendarEvent, isDark: Boolean) {
 fun ScheduledTaskCard(
     task: Task,
     isDark: Boolean,
+    isMeetConnected: Boolean = false,
+    isDriveConnected: Boolean = false,
     onToggleComplete: (Task) -> Unit,
     onMoveHour: (Int) -> Unit,
     onDeleteTask: (Task) -> Unit
@@ -814,6 +1241,54 @@ fun ScheduledTaskCard(
                         color = borderColor
                     )
                 }
+
+                if (isMeetConnected) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(Color(0xFF34A853).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Videocam,
+                            contentDescription = "Meet link",
+                            tint = Color(0xFF34A853),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Meet Space Ready • Click to Join Call",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF34A853)
+                        )
+                    }
+                }
+
+                if (isDriveConnected) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(Color(0xFFFBBC05).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = "Drive link",
+                            tint = Color(0xFFFBBC05),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Linked Drive folder: workspace_assets_v2",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFBBC05)
+                        )
+                    }
+                }
             }
 
             // Quick Drag-and-Drop scheduling controllers: Move forward or backward in hour timeline!
@@ -847,6 +1322,8 @@ fun ScheduledTaskCard(
 fun UnscheduledTaskCard(
     task: Task,
     isDark: Boolean,
+    isMeetConnected: Boolean = false,
+    isDriveConnected: Boolean = false,
     onToggleComplete: (Task) -> Unit,
     onScheduleToHour: (Int) -> Unit,
     onDeleteTask: (Task) -> Unit
@@ -916,6 +1393,54 @@ fun UnscheduledTaskCard(
                     ) {
                         Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = Color.Red.copy(alpha = 0.6f))
                     }
+                }
+            }
+
+            if (isMeetConnected) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(Color(0xFF34A853).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Videocam,
+                        contentDescription = "Meet Link",
+                        tint = Color(0xFF34A853),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Meet session configured dynamically",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF34A853)
+                    )
+                }
+            }
+
+            if (isDriveConnected) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(Color(0xFFFBBC05).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FolderOpen,
+                        contentDescription = "Drive Link",
+                        tint = Color(0xFFFBBC05),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Google Drive reference attached",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFBBC05)
+                    )
                 }
             }
 

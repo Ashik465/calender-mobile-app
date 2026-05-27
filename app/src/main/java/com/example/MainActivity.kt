@@ -23,7 +23,8 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     setContent {
       val isDark by viewModel.isDarkMode.collectAsStateWithLifecycle()
-      MyApplicationTheme(darkTheme = isDark) {
+      val animeTheme by viewModel.animeTheme.collectAsStateWithLifecycle()
+      MyApplicationTheme(animeTheme = animeTheme, darkTheme = isDark) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
           DashboardScreen(
             viewModel = viewModel,

@@ -74,11 +74,24 @@ class KokoroViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // Theme (Light/Blossom vs Dark/Tokyo)
-    private val _isDarkMode = MutableStateFlow(false)
+    private val _isDarkMode = MutableStateFlow(true) // Start dark to match Tokyo Cyberpunk
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
+
+    private val _animeTheme = MutableStateFlow("TOKYO_NIGHT")
+    val animeTheme: StateFlow<String> = _animeTheme.asStateFlow()
+
+    fun setAnimeTheme(themeName: String) {
+        _animeTheme.value = themeName
+        _isDarkMode.value = (themeName != "SAKURA_BLOSSOM")
+    }
 
     fun toggleDarkMode() {
         _isDarkMode.value = !_isDarkMode.value
+        if (_isDarkMode.value) {
+            _animeTheme.value = "TOKYO_NIGHT"
+        } else {
+            _animeTheme.value = "SAKURA_BLOSSOM"
+        }
     }
 
     // Calendar Integration States
@@ -105,6 +118,80 @@ class KokoroViewModel(application: Application) : AndroidViewModel(application) 
             // Clear google events from db
             AppDatabase.getDatabase(getApplication()).calendarEventDao().clearGoogleEvents()
         }
+    }
+
+    // Google Workspace App Connectivity States
+    private val _isGmailConnected = MutableStateFlow(false)
+    val isGmailConnected: StateFlow<Boolean> = _isGmailConnected.asStateFlow()
+
+    private val _isDriveConnected = MutableStateFlow(false)
+    val isDriveConnected: StateFlow<Boolean> = _isDriveConnected.asStateFlow()
+
+    private val _isTasksConnected = MutableStateFlow(false)
+    val isTasksConnected: StateFlow<Boolean> = _isTasksConnected.asStateFlow()
+
+    private val _isKeepConnected = MutableStateFlow(false)
+    val isKeepConnected: StateFlow<Boolean> = _isKeepConnected.asStateFlow()
+
+    private val _isMeetConnected = MutableStateFlow(false)
+    val isMeetConnected: StateFlow<Boolean> = _isMeetConnected.asStateFlow()
+
+    fun toggleGmailConnection() {
+        viewModelScope.launch {
+            val next = !_isGmailConnected.value
+            _isGmailConnected.value = next
+            if (next) {
+                repository.insertTask(Task(
+                    title = "📨 [Gmail] Reply to Sensei about Sakura picnic",
+                    description = "Urgent unread mail thread re: location coordinates and food list.",
+                    category = "Study",
+                    priority = "HIGH",
+                    dueDateString = _selectedDate.value,
+                    timeSlotHour = 9
+                ))
+            }
+        }
+    }
+
+    fun toggleDriveConnection() {
+        _isDriveConnected.value = !_isDriveConnected.value
+    }
+
+    fun toggleTasksConnection() {
+        viewModelScope.launch {
+            val next = !_isTasksConnected.value
+            _isTasksConnected.value = next
+            if (next) {
+                repository.insertTask(Task(
+                    title = "📋 [Google Tasks] Buy Vol 6 of Chainsaw Man",
+                    description = "Imported single task item from Google Tasks mobile app.",
+                    category = "General",
+                    priority = "MEDIUM",
+                    dueDateString = _selectedDate.value,
+                    timeSlotHour = 14
+                ))
+            }
+        }
+    }
+
+    fun toggleKeepConnection() {
+        viewModelScope.launch {
+            val next = !_isKeepConnected.value
+            _isKeepConnected.value = next
+            if (next) {
+                repository.insertHabit(Habit(
+                    name = "📓 Sync Keep doodle notes",
+                    icon = "📓",
+                    colorHex = "#FFE5B4",
+                    streak = 1,
+                    bestStreak = 4
+                ))
+            }
+        }
+    }
+
+    fun toggleMeetConnection() {
+        _isMeetConnected.value = !_isMeetConnected.value
     }
 
     // Stream list of habits with reactive progress tracking!

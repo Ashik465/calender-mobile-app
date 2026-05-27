@@ -19,3 +19,22 @@ val CyberBg = Color(0xFF0D0D12)
 val CyberCardBg = Color(0xFF1A1A24)
 val CyberTextLight = Color(0xFFE2E8F0)
 val CyberTextMuted = Color(0xFF94A3B8)
+
+// Miku Vocaloid Turquoise Theme
+val MikuPrimary = Color(0xFF00E5FF)
+val MikuSecondary = Color(0xFF00FFA1)
+val MikuBackground = Color(0xFF0B141C)
+val MikuCardBg = Color(0xFF13222F)
+
+// Sunshine Naruto Theme
+val SunshinePrimary = Color(0xFFFF7E00)
+val SunshineSecondary = Color(0xFFFFCC00)
+val SunshineBackground = Color(0xFF140E05)
+val SunshineCardBg = Color(0xFF261D0F)
+
+// Eva Neon Purple Theme
+val EvaPrimary = Color(0xFF9400D3)
+val EvaSecondary = Color(0xFF39FF14)
+val EvaBackground = Color(0xFF0D0C15)
+val EvaCardBg = Color(0xFF19172B)
+

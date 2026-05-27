@@ -39,21 +39,65 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = TextGray
 )
 
+private val MikuColorScheme = darkColorScheme(
+    primary = MikuPrimary,
+    secondary = MikuSecondary,
+    tertiary = Color(0xFF00FFCC),
+    background = MikuBackground,
+    surface = MikuCardBg,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.White,
+    onBackground = Color(0xFFE0F7FA),
+    onSurface = Color(0xFFE0F7FA),
+    onSurfaceVariant = Color(0xFF80DEEA)
+)
+
+private val SunshineColorScheme = darkColorScheme(
+    primary = SunshinePrimary,
+    secondary = SunshineSecondary,
+    tertiary = Color(0xFFFFA500),
+    background = SunshineBackground,
+    surface = SunshineCardBg,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.White,
+    onBackground = Color(0xFFFFF3E0),
+    onSurface = Color(0xFFFFF3E0),
+    onSurfaceVariant = Color(0xFFFFB74D)
+)
+
+private val EvaColorScheme = darkColorScheme(
+    primary = EvaPrimary,
+    secondary = EvaSecondary,
+    tertiary = Color(0xFF8A2BE2),
+    background = EvaBackground,
+    surface = EvaCardBg,
+    onPrimary = Color.White,
+    onSecondary = Color.Black,
+    onTertiary = Color.White,
+    onBackground = Color(0xFFF3E5F5),
+    onSurface = Color(0xFFF3E5F5),
+    onSurfaceVariant = Color(0xFFB39DDB)
+)
+
 @Composable
 fun MyApplicationTheme(
+    animeTheme: String = "TOKYO_NIGHT",
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Set to false by default to enforce the gorgeous hand-coded Japanese anime palettes!
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val colorScheme = when (animeTheme) {
+        "TOKYO_NIGHT" -> DarkColorScheme
+        "SAKURA_BLOSSOM" -> LightColorScheme
+        "MIKU_TEAL" -> MikuColorScheme
+        "SUNSHINE_ORANGE" -> SunshineColorScheme
+        "EVA_UNIT_01" -> EvaColorScheme
+        else -> if (darkTheme) DarkColorScheme else LightColorScheme
     }
+
 
     MaterialTheme(
         colorScheme = colorScheme,
