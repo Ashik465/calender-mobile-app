@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class KokoroViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: KokoroRepository
@@ -77,20 +79,20 @@ class KokoroViewModel(application: Application) : AndroidViewModel(application) 
     private val _isDarkMode = MutableStateFlow(true) // Start dark to match Tokyo Cyberpunk
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
-    private val _animeTheme = MutableStateFlow("TOKYO_NIGHT")
+    private val _animeTheme = MutableStateFlow("MIDNIGHT_BASS")
     val animeTheme: StateFlow<String> = _animeTheme.asStateFlow()
 
     fun setAnimeTheme(themeName: String) {
         _animeTheme.value = themeName
-        _isDarkMode.value = (themeName != "SAKURA_BLOSSOM")
+        _isDarkMode.value = (themeName == "MIDNIGHT_BASS" || themeName == "RETRO_VINYL")
     }
 
     fun toggleDarkMode() {
         _isDarkMode.value = !_isDarkMode.value
         if (_isDarkMode.value) {
-            _animeTheme.value = "TOKYO_NIGHT"
+            _animeTheme.value = "MIDNIGHT_BASS"
         } else {
-            _animeTheme.value = "SAKURA_BLOSSOM"
+            _animeTheme.value = "COZY_CAFE"
         }
     }
 

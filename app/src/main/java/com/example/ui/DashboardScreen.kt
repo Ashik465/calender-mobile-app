@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -40,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import com.example.R
 import com.example.data.CalendarEvent
 import com.example.data.Habit
@@ -192,19 +195,19 @@ fun HeaderBannerSection(
             .fillMaxWidth()
             .height(130.dp)
     ) {
-        // Render generated high-quality Ghibli desk banner as background image!
+        // Render generated high-quality cozy lofi banner as background image!
         Image(
-            painter = painterResource(id = R.drawable.img_anime_banner_1779909007170),
-            contentDescription = "Anime background cozy desk style",
+            painter = painterResource(id = R.drawable.img_lofi_banner_1779986967995),
+            contentDescription = "Lofi background cozy study desk style",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
 
         // Subtle gradient overlay for readability
         val colorOverlay = if (isDark) {
-            Brush.verticalGradient(listOf(Color(0xE00D0D12), Color(0xAA0D0D12)))
+            Brush.verticalGradient(listOf(Color(0xE014131C), Color(0xAA14131C)))
         } else {
-            Brush.verticalGradient(listOf(Color(0xBBFFF6F7), Color(0x66FFF6F7)))
+            Brush.verticalGradient(listOf(Color(0xBBFAF6F0), Color(0x66FAF6F0)))
         }
         Box(
             modifier = Modifier
@@ -299,18 +302,18 @@ fun HeaderBannerSection(
     }
 }
 
-// ==================== ANIME THEME SELECTOR ====================
+// ==================== LOFI CHILL THEME SELECTOR ====================
 @Composable
 fun AnimeThemeSelector(
     activeTheme: String,
     onThemeSelected: (String) -> Unit
 ) {
     val themes = listOf(
-        "TOKYO_NIGHT" to ("🌃 Tokyo Cyber" to Color(0xFFFF4E8D)),
-        "SAKURA_BLOSSOM" to ("🌸 Sakura Bloom" to Color(0xFFFF8DA1)),
-        "MIKU_TEAL" to ("🎤 Miku Teal" to Color(0xFF00E5FF)),
-        "SUNSHINE_ORANGE" to ("🦊 Sunny Naruto" to Color(0xFFFF7E00)),
-        "EVA_UNIT_01" to ("🤖 Neon Eva" to Color(0xFF9400D3))
+        "MIDNIGHT_BASS" to ("🎧 Midnight Bass" to Color(0xFF9E9EF8)),
+        "COZY_CAFE" to ("☕ Cozy Cafe" to Color(0xFFB57C5A)),
+        "RAINY_DAY" to ("🌧️ Rainy Day" to Color(0xFF4C7085)),
+        "RETRO_VINYL" to ("📻 Retro Vinyl" to Color(0xFFE67E22)),
+        "MATCHA_LATTE" to ("🍵 Matcha Latte" to Color(0xFF6E8E6C))
     )
 
     Column(
@@ -319,7 +322,7 @@ fun AnimeThemeSelector(
             .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
         Text(
-            text = "🎨 SELECT ANIME THEME",
+            text = "🎵 SELECT LOFI CHILL THEME",
             fontWeight = FontWeight.Bold,
             fontSize = 10.sp,
             letterSpacing = 1.sp,
@@ -382,17 +385,22 @@ fun CalendarStripSection(
     val formatDayOfWeek = SimpleDateFormat("EEE", Locale.getDefault())
     val formatMonthYear = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
 
-    val currentDate = remember(selectedDate) {
+    val initialDate = remember(selectedDate) {
         try { sdf.parse(selectedDate) } catch(e: Exception) { Date() } ?: Date()
+    }
+    
+    var displayedMonthAndYearDate by remember(initialDate) {
+        mutableStateOf(initialDate)
     }
 
     var isMonthView by remember { mutableStateOf(true) }
 
-    // Generate current week dates
-    val datesOfCurrentWeek = remember {
+    // Generate current week dates dynamically based on selected displayed month/date
+    val datesOfCurrentWeek = remember(displayedMonthAndYearDate) {
         val list = mutableListOf<String>()
         val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek) // Go to start of this week
+        cal.time = displayedMonthAndYearDate
+        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek) // Go to start of that week
         for (i in 0..6) {
             list.add(sdf.format(cal.time))
             cal.add(Calendar.DAY_OF_MONTH, 1)
@@ -401,7 +409,7 @@ fun CalendarStripSection(
     }
 
     val cal = Calendar.getInstance()
-    cal.time = currentDate
+    cal.time = displayedMonthAndYearDate
     val currentMonthIdx = cal.get(Calendar.MONTH)
     val currentYear = cal.get(Calendar.YEAR)
 
@@ -427,69 +435,172 @@ fun CalendarStripSection(
         list
     }
 
+    // Touch gesture swipe recognition modifier
+    var totalDragX by remember { mutableStateOf(0f) }
+    val swipeModifier = Modifier.pointerInput(isMonthView, displayedMonthAndYearDate) {
+        detectHorizontalDragGestures(
+            onDragStart = { totalDragX = 0f },
+            onDragEnd = {
+                if (totalDragX > 100f) {
+                    // Swiped right -> Load PREVIOUS month or week
+                    val c = Calendar.getInstance()
+                    c.time = displayedMonthAndYearDate
+                    if (isMonthView) {
+                        c.add(Calendar.MONTH, -1)
+                    } else {
+                        c.add(Calendar.WEEK_OF_YEAR, -1)
+                    }
+                    displayedMonthAndYearDate = c.time
+                } else if (totalDragX < -100f) {
+                    // Swiped left -> Load NEXT month or week
+                    val c = Calendar.getInstance()
+                    c.time = displayedMonthAndYearDate
+                    if (isMonthView) {
+                        c.add(Calendar.MONTH, 1)
+                    } else {
+                        c.add(Calendar.WEEK_OF_YEAR, 1)
+                    }
+                    displayedMonthAndYearDate = c.time
+                }
+            },
+            onHorizontalDrag = { change, dragAmount ->
+                change.consume()
+                totalDragX += dragAmount
+            }
+        )
+    }
+
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        // --- HEADER ROW ---
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Left: Toggle visual style for Month/Week
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { isMonthView = !isMonthView }
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                    .clickable { isMonthView = !isMonthView }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
-                Text(
-                    text = if (isMonthView) "📅 Whole Month Grid" else "🌸 Weekly Stream",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.primary
+                Icon(
+                    imageVector = if (isMonthView) Icons.Default.CalendarToday else Icons.Default.DateRange,
+                    contentDescription = "Toggle calendar type",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isMonthView) "Month View" else "Week View",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(2.dp))
                 Icon(
                     imageVector = if (isMonthView) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = "Expand month calendar",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    modifier = Modifier.size(14.dp)
                 )
             }
-            Text(
-                text = "${formatMonthYear.format(currentDate)}",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+
+            // Right: Manual Navigator Chevrons + Display Month Name
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                IconButton(
+                    onClick = {
+                        val c = Calendar.getInstance()
+                        c.time = displayedMonthAndYearDate
+                        if (isMonthView) {
+                            c.add(Calendar.MONTH, -1)
+                        } else {
+                            c.add(Calendar.WEEK_OF_YEAR, -1)
+                        }
+                        displayedMonthAndYearDate = c.time
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "Previous Month/Week",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Text(
+                    text = formatMonthYear.format(displayedMonthAndYearDate),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+
+                IconButton(
+                    onClick = {
+                        val c = Calendar.getInstance()
+                        c.time = displayedMonthAndYearDate
+                        if (isMonthView) {
+                            c.add(Calendar.MONTH, 1)
+                        } else {
+                            c.add(Calendar.WEEK_OF_YEAR, 1)
+                        }
+                        displayedMonthAndYearDate = c.time
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Next Month/Week",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (isMonthView) {
-            // Render beautiful whole month calendar grid
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
-                ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    // S M T W T F S headers
+        // --- CALENDAR CARD CONTAINER ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(swipeModifier),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+            ),
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                if (isMonthView) {
+                    // Day letter titles row
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa").forEach { wd ->
+                        listOf("SU", "MO", "TU", "WE", "TH", "FR", "SA").forEach { wd ->
                             Text(
                                 text = wd,
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Center,
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                letterSpacing = 0.5.sp
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     val rows = monthDays.chunked(7)
                     rows.forEach { rowDays ->
@@ -499,114 +610,173 @@ fun CalendarStripSection(
                         ) {
                             rowDays.forEach { dayDate ->
                                 if (dayDate == null) {
-                                    Spacer(modifier = Modifier.weight(1f).aspectRatio(1.2f).padding(2.dp))
+                                    Spacer(modifier = Modifier.weight(1f).aspectRatio(1f).padding(2.dp))
                                 } else {
                                     val dateStr = sdf.format(dayDate)
                                     val isSelected = dateStr == selectedDate
                                     val isToday = sdf.format(Date()) == dateStr
                                     val dayNum = formatDay.format(dayDate)
 
-                                    Card(
+                                    Box(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .aspectRatio(1.2f)
-                                            .padding(2.dp)
+                                            .aspectRatio(1f)
+                                            .padding(3.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                color = when {
+                                                    isSelected -> MaterialTheme.colorScheme.primary
+                                                    isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    else -> Color.Transparent
+                                                }
+                                            )
+                                            .border(
+                                                width = if (isToday && !isSelected) 1.2.dp else 0.dp,
+                                                color = if (isToday && !isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.65f) else Color.Transparent,
+                                                shape = CircleShape
+                                            )
                                             .clickable { onDateSelected(dateStr) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isSelected) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else if (isToday) {
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                            } else {
-                                                Color.Transparent
-                                            }
-                                        ),
-                                        border = BorderStroke(
-                                            1.dp,
-                                            if (isSelected) MaterialTheme.colorScheme.primary 
-                                            else if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) 
-                                            else Color.Transparent
-                                        )
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Box(
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentAlignment = Alignment.Center
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
                                         ) {
                                             Text(
                                                 text = dayNum,
                                                 fontSize = 12.sp,
                                                 fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) {
-                                                    MaterialTheme.colorScheme.onPrimary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurface
+                                                color = when {
+                                                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                                                    isToday -> MaterialTheme.colorScheme.primary
+                                                    else -> MaterialTheme.colorScheme.onSurface
                                                 }
                                             )
+                                            if (isToday) {
+                                                Spacer(modifier = Modifier.height(1.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(3.dp)
+                                                        .background(
+                                                            if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                                            CircleShape
+                                                        )
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                             if (rowDays.size < 7) {
                                 for (i in 0 until (7 - rowDays.size)) {
-                                    Spacer(modifier = Modifier.weight(1f).aspectRatio(1.2f).padding(2.dp))
+                                    Spacer(modifier = Modifier.weight(1f).aspectRatio(1f).padding(2.dp))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Weekly strip style inside card
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        datesOfCurrentWeek.forEach { dateStr ->
+                            val date = sdf.parse(dateStr) ?: Date()
+                            val isSelected = dateStr == selectedDate
+                            val isToday = sdf.format(Date()) == dateStr
+                            val dayNum = formatDay.format(date)
+                            val dayOfWeek = formatDayOfWeek.format(date).uppercase(Locale.getDefault()).take(3)
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(0.75f)
+                                    .padding(vertical = 2.dp, horizontal = 2.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        color = when {
+                                            isSelected -> MaterialTheme.colorScheme.primary
+                                            isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                        }
+                                    )
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else if (isToday) 1.2.dp else 0.5.dp,
+                                        color = when {
+                                            isSelected -> MaterialTheme.colorScheme.primary
+                                            isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+                                            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                                        },
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { onDateSelected(dateStr) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = dayOfWeek,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when {
+                                            isSelected -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                                            isToday -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = dayNum,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = when {
+                                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                                            isToday -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+                                    if (isToday) {
+                                        Spacer(modifier = Modifier.height(1.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(3.dp)
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                                    CircleShape
+                                                )
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        } else {
-            // Render standard single row week strip
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                datesOfCurrentWeek.forEach { dateStr ->
-                    val date = sdf.parse(dateStr) ?: Date()
-                    val isSelected = dateStr == selectedDate
-                    val dayNum = formatDay.format(date)
-                    val dayOfWeek = formatDayOfWeek.format(date).take(3)
 
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 3.dp)
-                            .clickable { onDateSelected(dateStr) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
-                        ),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = dayOfWeek,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = dayNum,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
+                // Swipe indicator bar inside Card
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = "Swipe indicator",
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isMonthView) "SWIPE LEFT / RIGHT TO CHANGE MONTHS" else "SWIPE LEFT / RIGHT TO CHANGE WEEKS",
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    )
                 }
             }
         }
@@ -816,7 +986,7 @@ fun CalendarScheduleView(
                                             imageVector = when (name) {
                                                 "Gmail" -> Icons.Default.Email
                                                 "Drive" -> Icons.Default.FolderOpen
-                                                "Tasks" -> Icons.Default.ListAlt
+                                                "Tasks" -> Icons.AutoMirrored.Filled.ListAlt
                                                 "Keep" -> Icons.Default.Edit
                                                 else -> Icons.Default.Videocam
                                             },
@@ -1575,7 +1745,7 @@ fun AddTaskDialog(
     )
 }
 
-// Anime Mascot state reactive card
+// Lofi Mascot state reactive card
 @Composable
 fun MascotReactionSection(tasks: List<Task>, isDark: Boolean, bubbleCardBorder: BorderStroke) {
     val completedCount = tasks.count { it.isCompleted }
@@ -1583,10 +1753,10 @@ fun MascotReactionSection(tasks: List<Task>, isDark: Boolean, bubbleCardBorder: 
     val completionRatio = if (totalCount > 0) completedCount.toFloat() / totalCount else 0f
 
     val speechBubbleText = when {
-        totalCount == 0 -> "Okaeri! Click the 'New Schedule' to add priorities and begin! (✿˵•́ ᴗ •̀˵)"
-        completionRatio == 1f -> "Yatta! You completed everything today! Splendid work Master! ฅ(≈>ܫ<≈)ฅ"
-        completionRatio >= 0.5f -> "Sugoi! You are doing amazing! Ganbare, keep going! ٩(ˊᗜˋ*)و"
-        else -> "Ready to check some priorities, Master? Let's take it task by task! (~ ˘▾˘)~"
+        totalCount == 0 -> "Welcome to your cozy workspace! Let's brew some delicious coffee and add our daily schedule beats below. (☕ ˘◡˘)"
+        completionRatio == 1f -> "Splendid work! Every single checkoff completed. Time to slide on our headphones and spin some records! (🎧•̀ᴗ•́)"
+        completionRatio >= 0.5f -> "Brilliant rhythm! You are more than halfway through today's focus session. Step by step! (🌱 •ᵕ•)"
+        else -> "Let's take it beat by beat, friend. What sweet focus priorities are we tackling next? (~ ˘▾˘)~"
     }
 
     Card(
@@ -1594,7 +1764,7 @@ fun MascotReactionSection(tasks: List<Task>, isDark: Boolean, bubbleCardBorder: 
         shape = RoundedCornerShape(16.dp),
         border = bubbleCardBorder,
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1B1B3D) else Color(0xFFFFF0F3)
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
         )
     ) {
         Row(
@@ -1603,9 +1773,9 @@ fun MascotReactionSection(tasks: List<Task>, isDark: Boolean, bubbleCardBorder: 
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Mascot illustration (Render the chibi cat mascot generated previously!)
+            // Mascot illustration (Render the chibi lofi white kitten with giant headphones!)
             Image(
-                painter = painterResource(id = R.drawable.img_anime_mascot_1779909024101),
+                painter = painterResource(id = R.drawable.img_lofi_mascot_1779986988024),
                 contentDescription = "Kokoro App mascot interactive chibi helper",
                 modifier = Modifier
                     .size(68.dp)
@@ -1626,7 +1796,7 @@ fun MascotReactionSection(tasks: List<Task>, isDark: Boolean, bubbleCardBorder: 
             ) {
                 Column {
                     Text(
-                        text = "Kokoro Mascot (Chibi helper)",
+                        text = "Cozy Lofi Companion",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -1975,7 +2145,7 @@ fun ProductivityAnalyticsView(
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
-                            progress = taskCompletionPct.toFloat() / 100f,
+                            progress = { taskCompletionPct.toFloat() / 100f },
                             modifier = Modifier.size(80.dp),
                             strokeWidth = 8.dp,
                             color = MaterialTheme.colorScheme.primary,
